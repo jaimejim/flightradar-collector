@@ -85,23 +85,36 @@ def fetch_community():
 
 
 def opensky_token():
-    """Exchange client credentials for a bearer token, or None if not configured."""
+    """Exchange client credentials for a bearer token.
+
+    Returns None if no credentials are configured. OpenSky's auth server is
+    flaky from cloud egress IPs (intermittent timeouts), so retry a few times
+    with backoff before giving up -- the token is fetched once per run, so a
+    little patience here is cheap.
+    """
     cid = os.environ.get("OPENSKY_CLIENT_ID", "").strip()
     secret = os.environ.get("OPENSKY_CLIENT_SECRET", "").strip()
     if not cid or not secret:
+        print("  opensky: no credentials configured")
         return None
     data = urllib.parse.urlencode({
         "grant_type": "client_credentials",
         "client_id": cid,
         "client_secret": secret,
     }).encode()
-    try:
-        req = urllib.request.Request(OPENSKY_TOKEN_URL, data=data)
-        with urllib.request.urlopen(req, timeout=30) as r:
-            return json.load(r)["access_token"]
-    except Exception as e:
-        print(f"  opensky token failed: {e}")
-        return None
+    attempts = 4
+    for i in range(1, attempts + 1):
+        try:
+            req = urllib.request.Request(OPENSKY_TOKEN_URL, data=data)
+            with urllib.request.urlopen(req, timeout=20) as r:
+                return json.load(r)["access_token"]
+        except Exception as e:
+            print(f"  opensky token attempt {i}/{attempts} failed: {e}")
+            if i < attempts:
+                time.sleep(3 * i)         # 3s, 6s, 9s backoff
+    print("  opensky: giving up on token (auth unreachable); "
+          "continuing community-only")
+    return None
 
 
 def fetch_opensky(token):
@@ -198,7 +211,7 @@ def main():
 
     os_token = opensky_token()
     print("OpenSky: " + ("enabled (authenticated)" if os_token
-                         else "disabled (no credentials)"))
+                         else "disabled (see reason above)"))
 
     if LOOP_SECONDS <= 0:                   # legacy single-snapshot mode
         collect_once(ingest_token, os_token)
