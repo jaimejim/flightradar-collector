@@ -1,13 +1,17 @@
 name: collect
 # Forward ADS-B collector for flightradar.jaime.win — runs on GitHub's clean
-# runner IP (the community feeds throttle Cloudflare's shared Worker IPs).
-# Public repo => free unlimited Actions minutes.
+# runner IP (the community feeds + OpenSky throttle Cloudflare's shared Worker
+# IPs). Public repo => free unlimited Actions minutes.
+#
+# Each run self-loops (see collect.py LOOP_SECONDS), polling every ~25s and
+# pushing each snapshot, so freshness is ~25s rather than the cron interval.
 
 on:
   schedule:
-    # GitHub cron granularity is ~5 min and often lags under load. Every 10 min
-    # is a realistic, reliable cadence for a density map.
-    - cron: "*/10 * * * *"
+    # Fire every 5 min (GitHub's finest granularity; it often lags under load).
+    # Each run loops for ~4.5 min, so back-to-back runs give near-continuous
+    # coverage. Gaps when GitHub delays a run are harmless for a density map.
+    - cron: "*/5 * * * *"
   workflow_dispatch: {}   # allow manual runs from the Actions tab
 
 # Avoid overlapping runs if one is slow.
@@ -18,7 +22,7 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -27,4 +31,8 @@ jobs:
       - name: Collect and push
         env:
           INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
+          OPENSKY_CLIENT_ID: ${{ secrets.OPENSKY_CLIENT_ID }}
+          OPENSKY_CLIENT_SECRET: ${{ secrets.OPENSKY_CLIENT_SECRET }}
+          LOOP_SECONDS: "270"
+          INTERVAL_SECONDS: "25"
         run: python3 collect.py
