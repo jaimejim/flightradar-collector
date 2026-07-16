@@ -29,4 +29,15 @@ have clean IPs, so collection works from here — and nothing runs on a laptop.
 The token is only ever a GitHub secret — never committed. `collect.py` reads it
 from the `INGEST_TOKEN` env var.
 
+## Notes
+
+- **Push uses `curl`, not urllib.** Cloudflare's bot protection returns HTTP 403
+  to Python-urllib's request fingerprint; `curl` passes. `curl` is preinstalled
+  on GitHub runners.
+- **First-workflow registration:** GitHub only rescans workflows on a real file
+  content change — empty commits won't register a brand-new workflow. If it
+  shows 0 workflows after first push, edit the YAML (any change) and push again.
+- A benign warning about "Node.js 20 deprecated" refers to the checkout/setup
+  actions' runtime, not this code; safe to ignore.
+
 Data: community ADS-B feeds. GPS-interference overlay data: gpsjam.org (CC-BY).
