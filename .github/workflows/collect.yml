@@ -1,7 +1,8 @@
 name: collect
+# Forward ADS-B collector for flightradar.jaime.win — runs on GitHub's clean
+# runner IP (the community feeds throttle Cloudflare's shared Worker IPs).
+# Public repo => free unlimited Actions minutes.
 
-# Runs the ADS-B collector on GitHub's runners (clean IP) and pushes snapshots
-# to the flightradar Worker. Public repo => free unlimited Actions minutes.
 on:
   schedule:
     # GitHub cron granularity is ~5 min and often lags under load. Every 10 min
