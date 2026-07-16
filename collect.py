@@ -13,6 +13,7 @@ Env vars:
 """
 import json
 import os
+import subprocess
 import sys
 import urllib.request
 
@@ -48,13 +49,18 @@ def fetch_snapshot():
 
 
 def push(ac, now, token):
-    body = json.dumps({"aircraft": ac, "now": now}).encode()
-    req = urllib.request.Request(
-        INGEST_URL, data=body, method="POST",
-        headers={"Content-Type": "application/json",
-                 "Authorization": f"Bearer {token}"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.load(r)
+    # Push via curl, not urllib: Cloudflare's bot protection returns 403 to
+    # Python-urllib's request fingerprint, but lets curl through.
+    body = json.dumps({"aircraft": ac, "now": now})
+    proc = subprocess.run(
+        ["curl", "-sS", "-X", "POST", INGEST_URL,
+         "-H", "Content-Type: application/json",
+         "-H", f"Authorization: Bearer {token}",
+         "--data-binary", "@-"],
+        input=body, capture_output=True, text=True, timeout=60)
+    if proc.returncode != 0:
+        raise RuntimeError(f"curl failed: {proc.stderr.strip()}")
+    return json.loads(proc.stdout)
 
 
 def main():
